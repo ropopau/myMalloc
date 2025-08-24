@@ -1,15 +1,14 @@
 #include "malloc.h"
 
+
 void *my_malloc(size_t size)
 {
     if (size == 0)
         return NULL;
-    // Si pas d'allocator initialise...
     if (starting_point == NULL)
     {
         starting_point = bucket_new(size);
     }
-    // Sinon On parcours toute les pages pour verifier les memoires disponibles
     struct bucket *cstst = starting_point;
     void *to_ret = bucket_get_free(cstst, size);
 
@@ -42,10 +41,8 @@ void my_free(void *ptr)
 {
     if (ptr == NULL)
         return;
-    // Retourner le bucket dans lequel ptr est presen
-    struct bucket *a = get_begin(ptr);
-    // On l'ajoute dans la free list
-    bucket_append(a, ptr);
+    struct bucket *bucket = get_begin(ptr);
+    bucket_free_block(bucket, ptr);
     return;
 }
 
@@ -64,20 +61,15 @@ void *my_realloc(void *ptr, size_t size)
             return ptr;
         }
     }
-    // Retourner le bucket dans lequel ptr est presen
     struct bucket *a = get_begin(ptr);
     if (a->block_size >= size)
         return ptr;
 
-    // On trouve une nouvelle zone memoire de nouvelle taille.
     void *new = my_malloc(size);
     if (new == NULL)
         return NULL;
-    // Nouvelle adresse
     unsigned char *ha = new;
-    // Ancienne adresse
     unsigned char *hb = ptr;
-    // On copie tout les donnée de l'ancienne vers la nouvelle
     for (size_t ind = 0; ind < a->block_size; ind++)
     {
         ha[ind] = hb[ind];
@@ -89,6 +81,7 @@ void *my_realloc(void *ptr, size_t size)
 
 /*
  * Functions that will replace the system malloc library's.
+ * Explicit visibility as the library will be compiled with -fvisibility=hidden 
  */
 __attribute__((visibility("default"))) void *malloc(size_t size)
 {

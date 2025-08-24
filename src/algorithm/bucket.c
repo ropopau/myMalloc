@@ -4,29 +4,36 @@
 void *starting_point = NULL;
 
 
+/*
+ * Get the bucket given a memory address 
+ */
 struct bucket *get_begin(void *ptr)
 {
-    size_t newptr = (size_t)ptr;
 
     uintptr_t ps = sysconf(_SC_PAGESIZE) - 1;
-    uintptr_t buck = (uintptr_t)newptr & ~ps;
-    // On retrouve le debut de la page actuelle
-    struct bucket *a = (struct bucket *)buck;
-    return a;
+    uintptr_t bucket_start_ptr = (uintptr_t)ptr & ~ps;
+    return (struct bucket *)bucket_start_ptr;
 }
 
-// BEGIN BUCKET
+/*
+ * Return the size that is aligned with a given alignment
+ * 
+ */
 struct bucket *bucket_new(size_t block_size)
 {
-    // Taille finale de la page de mempore
+    // computing final size of the bucket
+    // example:
+    // SC_PAGESIZE is usually 4096 bytes so this Align here will most of the time be 4096
     size_t new_size =
         align(block_size + sizeof(struct bucket), sysconf(_SC_PAGESIZE));
+    // initialize the bucket to add 
     struct bucket *to_add = mmap(NULL, new_size, PROT_READ | PROT_WRITE,
                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+     
     if (to_add == MAP_FAILED)
         return NULL;
 
-    // Size of bucket's metadata
+    // The medatada are align to the block size. Not really efficient when big block size. 
     size_t meta_size = align(sizeof(struct bucket), sizeof(long double));
     // On inscrit les metadonnees
     to_add->next = NULL;
@@ -36,11 +43,11 @@ struct bucket *bucket_new(size_t block_size)
 
     to_add->remain_block = to_add->total_size / to_add->block_size;
 
-    // Premier bloc
+    // First usable block are after the metadatas and is the field data of the structure
     void *actu = (unsigned char *)to_add + meta_size;
-    // On l'ajoute au champs data
+    
+    // From the first block, 
     to_add->data = actu;
-
     for (size_t ind = 1; ind < (to_add->total_size / to_add->block_size); ind++)
     {
         // On recupere le prochain
@@ -53,6 +60,9 @@ struct bucket *bucket_new(size_t block_size)
     return to_add;
 }
 
+/*
+ *  Return the size that is aligned with a given alignment
+ */
 void *bucket_pop(struct bucket *blka)
 {
     if (blka == NULL)
@@ -66,42 +76,41 @@ void *bucket_pop(struct bucket *blka)
     return ret;
 }
 
-// On ajoute dans la free list
-void bucket_append(struct bucket *blka, struct free_list *fl)
+/*
+ * Add a new block in the freelist
+ * If every block are free after, it will unmap the given bucket
+ */
+void bucket_free_block(struct bucket *blka, struct free_list *fl)
 {
-    // On sauvegarde la premiere adresse libre
+    // Save the first block of the freelist
     struct free_list *top = blka->data;
-    // le suivant de la free a insere est le top au dessus
+    
+    // Prepending the new block to the existing freelist
     fl->next = top;
-    // Le top est la nouvelle free
     blka->data = fl;
-    // On incremente de 1 le nombre de bloc restant
+   
+    // Incrementing remaining block by 1 
     blka->remain_block++;
-    // Si tout est libre apres le free.
-    //
+
+    // If every blocks are free,
+    // we are deleting the bucket
     if (blka->remain_block == blka->total_size / blka->block_size)
     {
-        // On recupere le size de la page
         size_t tot_size = align(blka->block_size + sizeof(struct bucket),
                                 sysconf(_SC_PAGESIZE));
 
-        // On recupere le next
         struct bucket *next = blka->next;
         struct bucket *prev = blka->prev;
-        // Si le bucket actuelle est en plein milieu
+        
         if (next != NULL && prev != NULL)
         {
-            // le suivant du precedent devient le suivant de l'actuel
             prev->next = next;
-            // le precedent du suivant deviens le precedent de l'actuel
             next->prev = prev;
         }
-        // Si le bucket est a la fin
         else if (next == NULL && prev != NULL)
         {
             prev->next = NULL;
         }
-        // Si le bucket est au debut
         else if (next != NULL && prev == NULL)
         {
             starting_point = next;
@@ -116,13 +125,15 @@ void bucket_append(struct bucket *blka, struct free_list *fl)
     return;
 }
 
-// Renvoie le premier bloc adapte
+/*
+ * Return the size that is aligned with a given alignment
+ */
 void *bucket_get_free(struct bucket *blka, size_t block_size)
 {
     struct bucket *actu = blka;
-    // On cherche
     while (actu != NULL)
     {
+        // If the block_size matches and there is one ore more remaining blocks  
         if (align(block_size, sizeof(long double)) == actu->block_size
             && actu->remain_block > 0)
         {
@@ -131,19 +142,14 @@ void *bucket_get_free(struct bucket *blka, size_t block_size)
         }
         actu = actu->next;
     }
-    // On creer un nouveau bloc et on le renvoie et on le rattache au bucket
-    // initial
 
-    // Nouveau bloc
     struct bucket *new = bucket_new(block_size);
     if (new == NULL)
         return NULL;
-    // On le prepend au premier bucket
     struct bucket *top = starting_point;
     top->prev = new;
     new->next = top;
     starting_point = new;
-    // On renvoie le premier libre de ce nouveau bloc
     void *a = bucket_pop(new);
 
     return a;

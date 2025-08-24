@@ -1,4 +1,4 @@
-CC = gcc
+CC = clang
 CPPFLAGS = -D_DEFAULT_SOURCE
 CFLAGS = -Wall -Wextra -Werror -std=c99 -Wvla
 LDFLAGS = -shared
@@ -11,6 +11,7 @@ SRCS := $(shell find src -name '*.c')
 OBJS := $(SRCS:.c=.o)
 
 # detection OS pour rpath
+# J'ai du faire ce bazard parce que je suis sur mac mais normalement on peut utiliser LD_LIBRARY_PATH
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
     RPATH_FLAG = -Wl,-rpath,'$$ORIGIN/../'
@@ -48,6 +49,9 @@ check: test
 		./$$bin; \
 	done
 
+sanitize: CFLAGS += -fsanitize=address,undefined -g
+sanitize: LDFLAGS += -fsanitize=address,undefined
+sanitize: clean tests
 
 debug: CFLAGS += -g
 debug: clean $(TARGET_LIB)

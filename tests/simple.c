@@ -4,7 +4,6 @@
 
 int main(void)
 {
-    
     printf("TEST: Simple");
     void *a = malloc(5000);
     void *b = realloc(a, 3000);

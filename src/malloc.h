@@ -5,6 +5,10 @@
 
 #include "./algorithm/bucket.h"
 
+// malloc(3) reimplementations
+
+
+// Functions
 void *malloc(size_t size);
 void free(void *ptr);
 void *calloc(size_t number, size_t size);
