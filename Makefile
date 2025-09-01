@@ -1,4 +1,6 @@
-CC = clang
+export LD_LIBRARY_PATH := .
+
+CC = gcc
 CPPFLAGS = -D_DEFAULT_SOURCE
 CFLAGS = -Wall -Wextra -Werror -std=c99 -Wvla
 LDFLAGS = -shared
@@ -12,13 +14,13 @@ OBJS := $(SRCS:.c=.o)
 
 # detection OS pour rpath
 # J'ai du faire ce bazard parce que je suis sur mac mais normalement on peut utiliser LD_LIBRARY_PATH
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-    RPATH_FLAG = -Wl,-rpath,'$$ORIGIN/../'
-endif
-ifeq ($(UNAME_S),Darwin)
-    RPATH_FLAG = -Wl,-rpath,@executable_path/..
-endif
+#UNAME_S := $(shell uname -s)
+#ifeq ($(UNAME_S),Linux)
+    #RPATH_FLAG = -W,-rpath,'$$ORIGIN/../'
+#endif
+#ifeq ($(UNAME_S),Darwin)
+#    RPATH_FLAG = -W,-rpath,@executable_path/..
+#endif
 
 all: library test
 
@@ -26,7 +28,7 @@ all: library test
 library: $(TARGET_LIB)
 
 $(TARGET_LIB): CFLAGS += -pedantic -fvisibility=hidden -fPIC
-$(TARGET_LIB): LDFLAGS += -Wl
+$(TARGET_LIB): LDFLAGS += -W
 $(TARGET_LIB): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
@@ -40,7 +42,7 @@ TEST_BINS := $(TEST_SRCS:tests/%.c=tests/%)
 test: $(TEST_BINS)
 
 tests/%: tests/%.c $(TARGET_LIB)
-	$(CC) $(CFLAGS) -o $@ $< -L. -lmalloc $(RPATH_FLAG)
+	$(CC) $(CFLAGS) -o $@ $< -L. -lmalloc
 
 # Lance tous les tests
 check: test
